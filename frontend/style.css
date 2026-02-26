@@ -1,0 +1,169 @@
+/* ── Reset & base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: system-ui, sans-serif;
+  background: #0d0d0d;
+  color: #f0f0f0;
+  height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Screen switching ─────────────────────────────────────────────────────── */
+.screen { display: none; width: 100%; height: 100%; }
+.screen.active { display: flex; align-items: center; justify-content: center; }
+
+/* ── Upload screen ────────────────────────────────────────────────────────── */
+.upload-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.2rem;
+  padding: 2.5rem 3rem;
+  background: #1a1a1a;
+  border-radius: 1rem;
+  max-width: 480px;
+  width: 90%;
+}
+
+.logo { font-size: 2.4rem; font-weight: 800; letter-spacing: -.04em; }
+.tagline { color: #888; font-size: .95rem; }
+
+.upload-label {
+  width: 100%;
+  border: 2px dashed #444;
+  border-radius: .75rem;
+  padding: 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .2s;
+}
+.upload-label:hover { border-color: #888; }
+.upload-label.has-file { border-color: #5b9cf6; }
+
+.toggle-row {
+  display: flex;
+  gap: .6rem;
+  align-items: center;
+  font-size: .9rem;
+  color: #aaa;
+  cursor: pointer;
+}
+
+#upload-btn {
+  width: 100%;
+  padding: .8rem;
+  font-size: 1rem;
+  font-weight: 700;
+  background: #5b9cf6;
+  color: #000;
+  border: none;
+  border-radius: .6rem;
+  cursor: pointer;
+  transition: opacity .2s;
+}
+#upload-btn:disabled { opacity: .35; cursor: not-allowed; }
+#upload-btn:hover:not(:disabled) { opacity: .85; }
+
+/* ── Progress screen ──────────────────────────────────────────────────────── */
+.progress-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  width: min(440px, 90%);
+}
+
+#stage-label { font-size: 1.1rem; font-weight: 600; }
+
+.progress-bar-track {
+  width: 100%;
+  height: 8px;
+  background: #2a2a2a;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: #5b9cf6;
+  border-radius: 4px;
+  transition: width .4s ease;
+}
+
+#progress-pct { font-size: .85rem; color: #888; }
+
+/* ── Player screen ────────────────────────────────────────────────────────── */
+#player-screen {
+  flex-direction: column;
+  background: #000;
+}
+
+#panel-viewer {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+#panel-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+#bubble-overlay {
+  position: absolute;
+  top: 0; left: 0;
+  pointer-events: none;
+}
+
+/* ── Controls bar ─────────────────────────────────────────────────────────── */
+#controls-bar {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  padding: .6rem 1.2rem;
+  background: #111;
+  flex-wrap: wrap;
+}
+
+#controls-bar button {
+  background: #2a2a2a;
+  color: #f0f0f0;
+  border: none;
+  border-radius: .4rem;
+  padding: .45rem .8rem;
+  font-size: .9rem;
+  cursor: pointer;
+  transition: background .15s;
+}
+#controls-bar button:hover { background: #3a3a3a; }
+
+.volume-label {
+  display: flex;
+  align-items: center;
+  gap: .35rem;
+  font-size: .85rem;
+}
+
+input[type="range"] { width: 80px; accent-color: #5b9cf6; }
+
+select {
+  background: #2a2a2a;
+  color: #f0f0f0;
+  border: none;
+  border-radius: .4rem;
+  padding: .4rem .6rem;
+  font-size: .85rem;
+  cursor: pointer;
+}
+
+#btn-share { margin-left: auto; }

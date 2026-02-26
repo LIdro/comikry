@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Comikry</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+
+  <!-- ── Upload screen ──────────────────────────────────────────────────── -->
+  <section id="upload-screen" class="screen active">
+    <div class="upload-card">
+      <h1 class="logo">Comikry</h1>
+      <p class="tagline">Comic text-to-speech reader</p>
+      <label class="upload-label" for="pdf-input">
+        <span>Drop a comic PDF here or click to browse</span>
+        <input type="file" id="pdf-input" accept=".pdf" hidden />
+      </label>
+      <label class="toggle-row">
+        <input type="checkbox" id="normalise-toggle" />
+        <span>Normalise panel images to widescreen</span>
+      </label>
+      <button id="upload-btn" disabled>Open Comic</button>
+    </div>
+  </section>
+
+  <!-- ── Processing screen ──────────────────────────────────────────────── -->
+  <section id="progress-screen" class="screen">
+    <div class="progress-card">
+      <h2 id="stage-label">Preparing…</h2>
+      <div class="progress-bar-track">
+        <div class="progress-bar-fill" id="progress-fill"></div>
+      </div>
+      <p id="progress-pct">0 %</p>
+    </div>
+  </section>
+
+  <!-- ── Player screen ──────────────────────────────────────────────────── -->
+  <section id="player-screen" class="screen">
+
+    <!-- Panel viewer -->
+    <div id="panel-viewer">
+      <img id="panel-img" src="" alt="Comic panel" />
+      <canvas id="bubble-overlay"></canvas>
+    </div>
+
+    <!-- Controls bar -->
+    <div id="controls-bar">
+      <button id="btn-prev" title="Previous panel (←)">&#9664;</button>
+      <button id="btn-play" title="Play / Pause (Space)">&#9654;</button>
+      <button id="btn-next" title="Next panel (→)">&#9654;&#9654;</button>
+
+      <label class="volume-label">
+        🔊
+        <input type="range" id="voice-vol" min="0" max="1" step="0.05" value="1" />
+      </label>
+      <label class="volume-label">
+        🎵
+        <input type="range" id="sfx-vol" min="0" max="1" step="0.05" value="0.4" />
+      </label>
+
+      <select id="speed-select" title="Playback speed">
+        <option value="0.75">0.75×</option>
+        <option value="1" selected>1×</option>
+        <option value="1.25">1.25×</option>
+        <option value="1.5">1.5×</option>
+      </select>
+
+      <select id="lang-select" title="Language"></select>
+
+      <button id="btn-share" title="Copy shareable link">🔗 Share</button>
+    </div>
+
+  </section>
+
+  <script type="module" src="/viewer/viewer.js"></script>
+</body>
+</html>
