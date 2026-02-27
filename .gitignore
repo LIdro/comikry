@@ -1,6 +1,7 @@
 .env
 storage/
 comikry_idea_development.txt
+IMPLEMENTATION_PROMPT.md
 __pycache__/
 *.pyc
 *.pyo
