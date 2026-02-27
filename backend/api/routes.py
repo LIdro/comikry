@@ -202,6 +202,12 @@ async def get_story_bible(comic_id: str):
     return json.loads(story_bible_path.read_text())
 
 
+@router.get("/api/health")
+async def health_check():
+    """Simple liveness probe — useful for warming up tunnel auth."""
+    return {"ok": True}
+
+
 @router.post("/api/reload-config")
 async def reload_config():
     """

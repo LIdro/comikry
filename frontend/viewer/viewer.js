@@ -11,6 +11,60 @@
 const API = "";          // empty = same origin
 const POLL_MS = 1500;    // status poll interval
 
+// ── Safe fetch helpers ────────────────────────────────────────────────────────
+// Every API call goes through apiGet / apiPost so that:
+//   • Non-2xx responses throw with a readable message instead of crashing in .json()
+//   • Tunnel auth-pages (HTML instead of JSON) are caught and reported clearly
+//   • Network failures show a useful message
+
+async function apiGet(path) {
+  let res;
+  try {
+    res = await fetch(`${API}${path}`, {
+      headers: { "Accept": "application/json" },
+    });
+  } catch (err) {
+    throw new Error(`Network error on GET ${path}: ${err.message}`);
+  }
+  return _parseJsonResponse(res, "GET", path);
+}
+
+async function apiPost(url, body, extraHeaders = {}) {
+  let res;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      body,
+      headers: { "Accept": "application/json", ...extraHeaders },
+    });
+  } catch (err) {
+    throw new Error(`Network error on POST ${url}: ${err.message}`);
+  }
+  return _parseJsonResponse(res, "POST", url);
+}
+
+async function _parseJsonResponse(res, method, url) {
+  const contentType = res.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    // Tunnel returned an HTML page (auth wall, rate limit, etc.)
+    const preview = (await res.text().catch(() => "")).slice(0, 200);
+    throw new Error(
+      `Server returned non-JSON (${res.status}) for ${method} ${url}.\n` +
+      `Content-Type: ${contentType}\n` +
+      `Body preview: ${preview || "(empty)"}\n\n` +
+      `If you are using a Colab tunnel, open the tunnel URL directly in a new tab first ` +
+      `to dismiss any auth warning, then return here and refresh.`
+    );
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(
+      `HTTP ${res.status} on ${method} ${url}: ${body.detail ?? res.statusText}`
+    );
+  }
+  return res.json();
+}
+
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 const uploadScreen   = document.getElementById("upload-screen");
 const progressScreen = document.getElementById("progress-screen");
@@ -61,6 +115,28 @@ const STAGE_LABELS = {
   failed:               "Processing failed.",
 };
 
+// ── Error display ─────────────────────────────────────────────────────────────
+function showError(err) {
+  console.error(err);
+  stageLabel.textContent = "Error — see details below";
+  progressFill.style.width = "0%";
+  progressPct.textContent = "";
+
+  // Reuse the progress card to show the error message
+  let detail = document.getElementById("error-detail");
+  if (!detail) {
+    detail = document.createElement("pre");
+    detail.id = "error-detail";
+    detail.style.cssText =
+      "margin:12px 0 0;padding:10px;background:#1a0a0a;color:#f87171;" +
+      "border-radius:6px;font-size:12px;white-space:pre-wrap;word-break:break-word;" +
+      "max-height:200px;overflow-y:auto;text-align:left";
+    document.querySelector(".progress-card").appendChild(detail);
+  }
+  detail.textContent = err.message ?? String(err);
+  showScreen(progressScreen);
+}
+
 // ── Screen helpers ────────────────────────────────────────────────────────────
 function showScreen(screen) {
   [uploadScreen, progressScreen, playerScreen].forEach(s =>
@@ -104,21 +180,30 @@ uploadBtn.addEventListener("click", async () => {
   uploadBtn.disabled = true;
   showScreen(progressScreen);
 
-  const res = await fetch(url, { method: "POST", body: formData });
-  const data = await res.json();
-
-  if (data.cached && data.stage === "done") {
-    await loadAndPlay(data.comic_id);
-  } else {
-    pollStatus(data.comic_id);
+  try {
+    const data = await apiPost(url.toString(), formData);
+    if (data.cached && data.stage === "done") {
+      await loadAndPlay(data.comic_id);
+    } else {
+      pollStatus(data.comic_id);
+    }
+  } catch (err) {
+    uploadBtn.disabled = false;
+    showError(err);
   }
 });
 
 // ── Status polling ────────────────────────────────────────────────────────────
 function pollStatus(comicId) {
   const interval = setInterval(async () => {
-    const res = await fetch(`${API}/comics/${comicId}/status`);
-    const data = await res.json();
+    let data;
+    try {
+      data = await apiGet(`/comics/${comicId}/status`);
+    } catch (err) {
+      clearInterval(interval);
+      showError(err);
+      return;
+    }
 
     stageLabel.textContent = STAGE_LABELS[data.stage] ?? data.stage;
     progressFill.style.width = `${data.progress_pct}%`;
@@ -126,18 +211,22 @@ function pollStatus(comicId) {
 
     if (data.stage === "done") {
       clearInterval(interval);
-      await loadAndPlay(comicId);
+      try {
+        await loadAndPlay(comicId);
+      } catch (err) {
+        showError(err);
+      }
     } else if (data.stage === "failed") {
       clearInterval(interval);
-      stageLabel.textContent = `Error: ${data.error}`;
+      showError(new Error(`Pipeline failed: ${data.error ?? "unknown error"}`));
     }
   }, POLL_MS);
 }
 
 // ── Load manifest and start playback ─────────────────────────────────────────
 async function loadAndPlay(comicId) {
-  const res = await fetch(`${API}/comics/${comicId}/manifest`);
-  manifest = await res.json();
+  const manifest_data = await apiGet(`/comics/${comicId}/manifest`);
+  manifest = manifest_data;
 
   // Populate language selector
   langSelect.innerHTML = "";
@@ -333,14 +422,22 @@ btnShare.addEventListener("click", () => {
   if (match) {
     showScreen(progressScreen);
     stageLabel.textContent = "Loading…";
-    const res = await fetch(`/play/${match[1]}`, { redirect: "follow" });
-    if (res.ok) {
+    try {
+      // The backend redirects /play/{token} → /comics/{id}/manifest
+      const res = await fetch(`/play/${match[1]}`, {
+        redirect: "follow",
+        headers: { "Accept": "application/json" },
+      });
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!res.ok || !contentType.includes("application/json")) {
+        throw new Error(`Could not load comic (status ${res.status}). The link may be invalid or expired.`);
+      }
       manifest = await res.json();
       pageIdx = panelIdx = bubbleIdx = 0;
       showScreen(playerScreen);
       renderPanel();
-    } else {
-      stageLabel.textContent = "Invalid or expired link.";
+    } catch (err) {
+      showError(err);
     }
   }
 })();
