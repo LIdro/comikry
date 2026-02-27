@@ -20,10 +20,14 @@ from __future__ import annotations
 
 import base64
 import json
+from typing import TYPE_CHECKING
 
 from backend.config import settings
 from backend.models import Bubble, Panel, Speaker
 from backend.pipeline.openrouter_client import chat_completion
+
+if TYPE_CHECKING:
+    from backend.models import CharacterProfile
 
 _SYSTEM_PROMPT = """\
 You are a comic character recognition agent. Given a panel image and a list of
@@ -61,14 +65,32 @@ async def attribute_speakers(
     panel: Panel,
     bubbles: list[Bubble],
     known_speakers: list[Speaker],
+    character_profiles: "list[CharacterProfile] | None" = None,
 ) -> tuple[list[Bubble], list[Speaker]]:
     """
     Attribute speakers to all bubbles in a panel.
 
-    Returns:
-        - Updated bubbles list (speaker_id set on each)
-        - List of newly discovered Speaker objects
+    Parameters
+    ----------
+    panel:
+        The panel whose image is used for visual attribution.
+    bubbles:
+        Bubbles found in this panel (speaker_id will be set in-place).
+    known_speakers:
+        Speaker registry built across all previous panels.
+    character_profiles:
+        Optional list of ``CharacterProfile`` objects from the Track B story
+        bible.  When provided, they are serialised and included in the prompt
+        so Gemini can match against cross-page character descriptions instead
+        of discovering cold.
+
+    Returns
+    -------
+    tuple[list[Bubble], list[Speaker]]
+        Updated bubbles list and any newly discovered Speaker objects.
     """
+    from backend.pipeline.gemini_files import upload_image
+
     known_list = [
         {"speaker_id": s.speaker_id, "label": s.inferred_label}
         for s in known_speakers
@@ -78,29 +100,48 @@ async def attribute_speakers(
         for b in bubbles
     ]
 
-    b64 = _encode_image(panel.image_path)
+    user_payload: dict = {"known_speakers": known_list, "bubbles": bubble_list}
+    if character_profiles:
+        user_payload["character_profiles"] = [
+            cp.model_dump() for cp in character_profiles
+        ]
 
-    messages = [
-        {"role": "system", "content": _SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{b64}"},
-                },
-                {
-                    "type": "text",
-                    "text": json.dumps(
-                        {"known_speakers": known_list, "bubbles": bubble_list}
-                    ),
-                },
-            ],
-        },
-    ]
+    uri = await upload_image(panel.image_path)
 
-    result = await chat_completion(settings.vision_model, messages)
-    raw = result["choices"][0]["message"]["content"].strip()
+    if uri:
+        # ── Gemini Files API path ──────────────────────────────────────────────
+        import google.generativeai as genai  # type: ignore
+
+        genai.configure(api_key=settings.google_ai_api_key)
+        model = genai.GenerativeModel(settings.vision_model)
+        file_ref = genai.get_file(uri)
+        response = model.generate_content(
+            [_SYSTEM_PROMPT, file_ref, json.dumps(user_payload)]
+        )
+        raw = response.text.strip()
+    else:
+        # ── Base64 fallback (existing OpenRouter path) ─────────────────────────
+        b64 = _encode_image(panel.image_path)
+
+        messages = [
+            {"role": "system", "content": _SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{b64}"},
+                    },
+                    {
+                        "type": "text",
+                        "text": json.dumps(user_payload),
+                    },
+                ],
+            },
+        ]
+
+        result = await chat_completion(settings.vision_model, messages)
+        raw = result["choices"][0]["message"]["content"].strip()
 
     if raw.startswith("```"):
         raw = raw.split("```")[1]

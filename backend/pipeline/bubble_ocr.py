@@ -51,25 +51,45 @@ async def detect_bubbles(panel: "Panel") -> list[Bubble]:  # type: ignore[name-d
     Detect and OCR all bubbles in a single panel image.
 
     Returns a list of Bubble objects (speaker_id not assigned yet).
+
+    If ``settings.use_gemini_files_api`` is True, the image is uploaded to the
+    Gemini Files API and referenced by URI; otherwise base64 encoding is used.
     """
-    b64 = _encode_image(panel.image_path)
+    from backend.pipeline.gemini_files import upload_image
 
-    messages = [
-        {"role": "system", "content": _SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{b64}"},
-                },
-                {"type": "text", "text": "Find all bubbles and extract their text."},
-            ],
-        },
-    ]
+    uri = await upload_image(panel.image_path)
 
-    result = await chat_completion(settings.vision_model, messages)
-    raw = result["choices"][0]["message"]["content"].strip()
+    if uri:
+        # ── Gemini Files API path ──────────────────────────────────────────────
+        import google.generativeai as genai  # type: ignore
+
+        genai.configure(api_key=settings.google_ai_api_key)
+        model = genai.GenerativeModel(settings.vision_model)
+        file_ref = genai.get_file(uri)
+        response = model.generate_content(
+            [_SYSTEM_PROMPT, file_ref, "Find all bubbles and extract their text."]
+        )
+        raw = response.text.strip()
+    else:
+        # ── Base64 fallback (existing OpenRouter path) ─────────────────────────
+        b64 = _encode_image(panel.image_path)
+
+        messages = [
+            {"role": "system", "content": _SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{b64}"},
+                    },
+                    {"type": "text", "text": "Find all bubbles and extract their text."},
+                ],
+            },
+        ]
+
+        result = await chat_completion(settings.vision_model, messages)
+        raw = result["choices"][0]["message"]["content"].strip()
 
     if raw.startswith("```"):
         raw = raw.split("```")[1]
@@ -97,5 +117,6 @@ async def detect_bubbles(panel: "Panel") -> list[Bubble]:  # type: ignore[name-d
                 ocr_confidence=float(item.get("confidence", 1.0)),
             )
         )
+
 
     return bubbles

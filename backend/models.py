@@ -119,6 +119,8 @@ class CacheRecord(BaseModel):
     error_message: Optional[str] = None
     created_at: str = ""
     updated_at: str = ""
+    page_range: Optional[tuple[int, int]] = None   # (start, end) inclusive 1-based; None = all pages
+    story_bible_path: Optional[str] = None         # relative path to story_bible.json (Track B)
 
 
 # ── Playback state (frontend uses this; not persisted) ───────────────────────
@@ -132,3 +134,43 @@ class PlaybackState(BaseModel):
     sfx_volume: float = 0.4               # 0.0–1.0
     playback_speed: float = 1.0
     language: str = "en"
+
+
+# ── Track B — Hierarchical Story Analysis models ──────────────────────────────
+
+class CharacterProfile(BaseModel):
+    """Persistent character identity built by the story analysis agents."""
+    character_id: str           # stable ID, e.g. "char_001"
+    name: str                   # inferred name or label
+    description: str            # physical appearance (for matching during attribution)
+    personality: str            # e.g. "brave, impulsive, loyal"
+    arc_summary: str            # how the character changes across the story
+    voice_tone_rules: str       # e.g. "speaks quickly when excited, whispers when scared"
+    gender: str = "unknown"
+    age_group: str = "adult"
+
+
+class StoryFragment(BaseModel):
+    """Analysis of a sub-range of pages produced by one page-range agent call."""
+    page_range: tuple[int, int]
+    characters: list[CharacterProfile] = Field(default_factory=list)
+    events: list[dict] = Field(default_factory=list)
+    # each event: {"pages": [int], "summary": str, "tone": str}
+    sfx_palette: list[dict] = Field(default_factory=list)
+    # each entry: {"page": int, "panel_order": int, "prompt": str}
+    unresolved: list[str] = Field(default_factory=list)
+
+
+class StoryBible(BaseModel):
+    """
+    Synthesised story bible produced by the story director agent from all
+    StoryFragment objects.  Stored at storage/{comic_id}/story_bible.json.
+    """
+    comic_id: str
+    characters: list[CharacterProfile] = Field(default_factory=list)
+    per_panel_sfx: dict[str, str] = Field(default_factory=dict)
+    # key = panel_id  e.g. "colab_test_pg0001_p001"  value = sfx prompt string
+    genre: str = ""
+    tone_summary: str = ""
+    narrator_voice_style: str = ""
+    created_at: str = ""

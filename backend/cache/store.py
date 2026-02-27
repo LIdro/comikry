@@ -28,7 +28,10 @@ import json
 from datetime import datetime, timezone
 from pathlib import Path
 
-from python_ulid import ULID
+try:
+    from python_ulid import ULID  # type: ignore[import]
+except ModuleNotFoundError:
+    from ulid import ULID  # python-ulid >= 3.x uses the 'ulid' package name
 
 from backend.config import settings
 from backend.models import CacheRecord, Comic, ProcessingStage

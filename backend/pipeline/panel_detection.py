@@ -52,27 +52,46 @@ async def detect_panels(
 
     Returns a list of Panel objects (without bubbles filled in yet).
     Cropped panel images are saved to storage/{comic_id}/panels/.
+
+    If ``settings.use_gemini_files_api`` is True, the image is uploaded to the
+    Gemini Files API and referenced by URI; otherwise base64 encoding is used.
     """
+    from backend.pipeline.gemini_files import upload_image
     from PIL import Image as PILImage
 
-    b64 = _encode_image(page_image_path)
+    uri = await upload_image(page_image_path)
 
-    messages = [
-        {"role": "system", "content": _SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": [
-                {
-                    "type": "image_url",
-                    "image_url": {"url": f"data:image/png;base64,{b64}"},
-                },
-                {"type": "text", "text": "Detect all panels on this comic page."},
-            ],
-        },
-    ]
+    if uri:
+        # ── Gemini Files API path (direct google-generativeai SDK) ────────────
+        import google.generativeai as genai  # type: ignore
 
-    result = await chat_completion(settings.vision_model, messages)
-    raw = result["choices"][0]["message"]["content"].strip()
+        genai.configure(api_key=settings.google_ai_api_key)
+        model = genai.GenerativeModel(settings.vision_model)
+        file_ref = genai.get_file(uri)
+        response = model.generate_content(
+            [_SYSTEM_PROMPT, file_ref, "Detect all panels on this comic page."]
+        )
+        raw = response.text.strip()
+    else:
+        # ── Base64 fallback (existing OpenRouter path) ─────────────────────────
+        b64 = _encode_image(page_image_path)
+
+        messages = [
+            {"role": "system", "content": _SYSTEM_PROMPT},
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{b64}"},
+                    },
+                    {"type": "text", "text": "Detect all panels on this comic page."},
+                ],
+            },
+        ]
+
+        result = await chat_completion(settings.vision_model, messages)
+        raw = result["choices"][0]["message"]["content"].strip()
 
     # Strip accidental markdown fences
     if raw.startswith("```"):

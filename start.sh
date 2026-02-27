@@ -28,6 +28,9 @@ done
 
 # ── Virtual environment ─────────────────────────────────────
 VENV_DIR="$SCRIPT_DIR/.venv"
+PYTHON="$VENV_DIR/bin/python"
+UVICORN="$VENV_DIR/bin/uvicorn"
+PIP="$VENV_DIR/bin/pip"
 
 if [[ ! -d "$VENV_DIR" ]]; then
   echo "► Creating virtual environment …"
@@ -39,7 +42,7 @@ source "$VENV_DIR/bin/activate"
 
 # ── Dependencies ─────────────────────────────────────────────
 echo "► Installing / verifying dependencies …"
-pip install -q -r requirements.txt
+"$PIP" install -q -r requirements.txt
 
 # ── .env check ───────────────────────────────────────────────
 if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
@@ -52,7 +55,7 @@ if [[ ! -f "$SCRIPT_DIR/.env" ]]; then
   exit 1
 fi
 
-if grep -q "YOUR_KEY_HERE" "$SCRIPT_DIR/.env" 2>/dev/null; then
+if grep -qE "OPENROUTER_API_KEY=your_openrouter_api_key_here|OPENROUTER_API_KEY=YOUR_KEY_HERE" "$SCRIPT_DIR/.env" 2>/dev/null; then
   echo ""
   echo "⚠️  OPENROUTER_API_KEY is still the placeholder value."
   echo "   Edit .env and set a real key before starting."
@@ -67,14 +70,14 @@ mkdir -p "$SCRIPT_DIR/storage"
 echo ""
 if [[ "$MODE" == "prod" ]]; then
   echo "🚀  Starting Comikry in PRODUCTION mode on http://$HOST:$PORT"
-  exec uvicorn backend.main:app \
+  exec "$UVICORN" backend.main:app \
     --host "$HOST" \
     --port "$PORT" \
     --workers 4
 else
   echo "🚀  Starting Comikry in DEVELOPMENT mode on http://$HOST:$PORT"
   echo "    (auto-reload enabled — do not use in production)"
-  exec uvicorn backend.main:app \
+  exec "$UVICORN" backend.main:app \
     --host "$HOST" \
     --port "$PORT" \
     --reload
