@@ -67,6 +67,7 @@ async function _parseJsonResponse(res, method, url) {
 
 // ── DOM refs ─────────────────────────────────────────────────────────────────
 const uploadScreen   = document.getElementById("upload-screen");
+const rangeScreen    = document.getElementById("range-screen");
 const progressScreen = document.getElementById("progress-screen");
 const playerScreen   = document.getElementById("player-screen");
 
@@ -74,6 +75,12 @@ const pdfInput       = document.getElementById("pdf-input");
 const uploadLabel    = document.querySelector(".upload-label");
 const normaliseToggle= document.getElementById("normalise-toggle");
 const uploadBtn      = document.getElementById("upload-btn");
+
+const rangeTotal     = document.getElementById("range-total");
+const rangeStart     = document.getElementById("range-start");
+const rangeEnd       = document.getElementById("range-end");
+const rangeAll       = document.getElementById("range-all");
+const rangeBtn       = document.getElementById("range-btn");
 
 const stageLabel     = document.getElementById("stage-label");
 const progressFill   = document.getElementById("progress-fill");
@@ -91,6 +98,10 @@ const sfxVol         = document.getElementById("sfx-vol");
 const speedSelect    = document.getElementById("speed-select");
 const langSelect     = document.getElementById("lang-select");
 const btnShare       = document.getElementById("btn-share");
+
+// ── Shared state ──────────────────────────────────────────────────────────────
+let _pendingFile  = null;   // File held between upload and range screens
+let _totalPages   = 1;
 
 // ── Playback state ────────────────────────────────────────────────────────────
 let manifest = null;          // full Comic JSON from /manifest
@@ -139,7 +150,7 @@ function showError(err) {
 
 // ── Screen helpers ────────────────────────────────────────────────────────────
 function showScreen(screen) {
-  [uploadScreen, progressScreen, playerScreen].forEach(s =>
+  [uploadScreen, rangeScreen, progressScreen, playerScreen].forEach(s =>
     s.classList.toggle("active", s === screen)
   );
 }
@@ -167,17 +178,85 @@ uploadLabel.addEventListener("drop", e => {
   }
 });
 
+// Step 1: "Open Comic" → call /pdf/info to get page count → show range screen
 uploadBtn.addEventListener("click", async () => {
   const file = pdfInput.files[0];
   if (!file) return;
 
+  uploadBtn.disabled = true;
+  uploadBtn.textContent = "Reading PDF…";
+
+  try {
+    const formData = new FormData();
+    formData.append("file", file);
+    const info = await apiPost(`${API}/pdf/info`, formData);
+
+    _pendingFile  = file;
+    _totalPages   = info.page_count ?? 1;
+
+    // Populate range inputs
+    rangeTotal.textContent = `${_totalPages} page${_totalPages !== 1 ? "s" : ""} detected in ${info.filename ?? file.name}`;
+    rangeStart.min = 1;
+    rangeStart.max = _totalPages;
+    rangeStart.value = 1;
+    rangeEnd.min   = 1;
+    rangeEnd.max   = _totalPages;
+    rangeEnd.value = _totalPages;
+    rangeAll.checked = true;
+    rangeStart.disabled = true;
+    rangeEnd.disabled   = true;
+
+    showScreen(rangeScreen);
+  } catch (err) {
+    uploadBtn.disabled = false;
+    uploadBtn.textContent = "Open Comic";
+    showError(err);
+  }
+});
+
+// ── Range screen ──────────────────────────────────────────────────────────────
+rangeAll.addEventListener("change", () => {
+  rangeStart.disabled = rangeAll.checked;
+  rangeEnd.disabled   = rangeAll.checked;
+  if (rangeAll.checked) {
+    rangeStart.value = 1;
+    rangeEnd.value   = _totalPages;
+  }
+});
+
+// Clamp values when user types
+rangeStart.addEventListener("change", () => {
+  let v = Math.max(1, Math.min(parseInt(rangeStart.value) || 1, _totalPages));
+  if (v > parseInt(rangeEnd.value)) v = parseInt(rangeEnd.value);
+  rangeStart.value = v;
+});
+rangeEnd.addEventListener("change", () => {
+  let v = Math.max(1, Math.min(parseInt(rangeEnd.value) || _totalPages, _totalPages));
+  if (v < parseInt(rangeStart.value)) v = parseInt(rangeStart.value);
+  rangeEnd.value = v;
+});
+
+// Step 2: "Start Processing" → POST /comics with page_start / page_end
+rangeBtn.addEventListener("click", async () => {
+  if (!_pendingFile) return;
+
+  const pageStart = parseInt(rangeStart.value);
+  const pageEnd   = parseInt(rangeEnd.value);
+  const processAll = rangeAll.checked;
+
   const formData = new FormData();
-  formData.append("file", file);
+  formData.append("file", _pendingFile);
 
   const url = new URL(`${API}/comics`, location.href);
   if (normaliseToggle.checked) url.searchParams.set("normalization", "true");
+  if (!processAll) {
+    url.searchParams.set("page_start", pageStart);
+    url.searchParams.set("page_end",   pageEnd);
+  }
 
-  uploadBtn.disabled = true;
+  rangeBtn.disabled = true;
+  uploadBtn.disabled = false;
+  uploadBtn.textContent = "Open Comic";
   showScreen(progressScreen);
 
   try {
@@ -188,7 +267,7 @@ uploadBtn.addEventListener("click", async () => {
       pollStatus(data.comic_id);
     }
   } catch (err) {
-    uploadBtn.disabled = false;
+    rangeBtn.disabled = false;
     showError(err);
   }
 });

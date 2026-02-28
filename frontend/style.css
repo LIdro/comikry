@@ -68,7 +68,54 @@ body {
 #upload-btn:disabled { opacity: .35; cursor: not-allowed; }
 #upload-btn:hover:not(:disabled) { opacity: .85; }
 
-/* ── Progress screen ──────────────────────────────────────────────────────── */
+/* ── Range screen ─────────────────────────────────────────────────────────── */
+.range-row {
+  display: flex;
+  align-items: flex-end;
+  gap: .4rem;
+  width: 100%;
+}
+
+.range-row label {
+  display: flex;
+  flex-direction: column;
+  gap: .35rem;
+  font-size: .85rem;
+  color: #aaa;
+  flex: 1;
+}
+
+.range-row input[type="number"] {
+  width: 100%;
+  padding: .55rem .7rem;
+  background: #2a2a2a;
+  color: #f0f0f0;
+  border: 1px solid #444;
+  border-radius: .5rem;
+  font-size: 1rem;
+  text-align: center;
+}
+
+.range-row input[type="number"]:disabled {
+  opacity: .35;
+}
+
+#range-btn {
+  width: 100%;
+  padding: .8rem;
+  font-size: 1rem;
+  font-weight: 700;
+  background: #5b9cf6;
+  color: #000;
+  border: none;
+  border-radius: .6rem;
+  cursor: pointer;
+  transition: opacity .2s;
+}
+#range-btn:disabled { opacity: .35; cursor: not-allowed; }
+#range-btn:hover:not(:disabled) { opacity: .85; }
+
+
 .progress-card {
   display: flex;
   flex-direction: column;

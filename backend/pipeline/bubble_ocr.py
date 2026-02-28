@@ -20,11 +20,10 @@ Expected Gemini response (parsed):
 from __future__ import annotations
 
 import base64
-import json
 
 from backend.config import settings
 from backend.models import BBox, Bubble, BubbleType
-from backend.pipeline.openrouter_client import chat_completion
+from backend.pipeline.openrouter_client import chat_completion, extract_json
 
 _SYSTEM_PROMPT = """\
 You are a comic book OCR specialist. Given a panel image, find every speech
@@ -96,7 +95,7 @@ async def detect_bubbles(panel: "Panel") -> list[Bubble]:  # type: ignore[name-d
         if raw.startswith("json"):
             raw = raw[4:]
 
-    bubble_data: list[dict] = json.loads(raw)
+    bubble_data: list[dict] = extract_json(raw, context=f"bubble_ocr panel={panel.panel_id}")
     bubbles: list[Bubble] = []
 
     for item in sorted(bubble_data, key=lambda d: d["order"]):

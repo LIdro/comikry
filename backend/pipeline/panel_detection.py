@@ -14,12 +14,11 @@ Expected Gemini response (parsed):
 from __future__ import annotations
 
 import base64
-import json
 from pathlib import Path
 
 from backend.config import settings
 from backend.models import BBox, Panel
-from backend.pipeline.openrouter_client import chat_completion
+from backend.pipeline.openrouter_client import chat_completion, extract_json
 
 _SYSTEM_PROMPT = """\
 You are a comic panel analyser. Given an image of a comic page, identify every
@@ -94,12 +93,7 @@ async def detect_panels(
         raw = result["choices"][0]["message"]["content"].strip()
 
     # Strip accidental markdown fences
-    if raw.startswith("```"):
-        raw = raw.split("```")[1]
-        if raw.startswith("json"):
-            raw = raw[4:]
-
-    panel_data: list[dict] = json.loads(raw)
+    panel_data: list[dict] = extract_json(raw, context=f"panel_detection page={page_id}")
 
     out_dir = Path(settings.storage_root) / comic_id / "panels"
     out_dir.mkdir(parents=True, exist_ok=True)

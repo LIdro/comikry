@@ -24,7 +24,7 @@ from typing import TYPE_CHECKING
 
 from backend.config import settings
 from backend.models import Bubble, Panel, Speaker
-from backend.pipeline.openrouter_client import chat_completion
+from backend.pipeline.openrouter_client import chat_completion, extract_json
 
 if TYPE_CHECKING:
     from backend.models import CharacterProfile
@@ -148,7 +148,7 @@ async def attribute_speakers(
         if raw.startswith("json"):
             raw = raw[4:]
 
-    data = json.loads(raw)
+    data = extract_json(raw, context=f"character_agent panel={panel.panel_id}")
 
     # Apply attributions
     attr_map = {a["bubble_id"]: a for a in data.get("attributions", [])}

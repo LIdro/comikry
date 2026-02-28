@@ -18,7 +18,7 @@ import json
 
 from backend.config import settings
 from backend.models import Comic
-from backend.pipeline.openrouter_client import chat_completion
+from backend.pipeline.openrouter_client import chat_completion, extract_json
 
 _SYSTEM_PROMPT = """\
 You are a sound director for a comic audiobook. Given a list of panels with
@@ -66,5 +66,5 @@ async def generate_sfx_prompts(comic: Comic) -> dict[str, str]:
         if raw.startswith("json"):
             raw = raw[4:]
 
-    sfx_data: list[dict] = json.loads(raw)
+    sfx_data: list[dict] = extract_json(raw, context="sound_director_agent")
     return {item["panel_id"]: item["prompt"] for item in sfx_data}

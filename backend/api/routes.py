@@ -1,6 +1,7 @@
 """
 FastAPI routes.
 
+POST   /pdf/info                    Get page count of a PDF (without processing)
 POST   /comics                      Upload a PDF; returns comic_id + status
 GET    /comics/{comic_id}/status    Processing stage + progress %
 GET    /comics/{comic_id}/manifest  Full Comic JSON (once done)
@@ -8,6 +9,8 @@ GET    /comics/{comic_id}/play      Shareable /play/{token} URL
 POST   /comics/{comic_id}/reprocess Force a fresh pipeline run
 GET    /comics/{comic_id}/story-bible  Story bible built by Track B (if available)
 GET    /play/{token}                Resolve token → redirect to manifest URL
+GET    /api/health                  Liveness probe
+POST   /api/reload-config           Hot-reload .env without restart
 """
 
 from __future__ import annotations
@@ -50,6 +53,33 @@ async def _process_in_background(
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@router.post("/pdf/info")
+async def pdf_info(file: UploadFile):
+    """
+    Return the page count of an uploaded PDF without starting any processing.
+
+    Used by the frontend page-range picker to populate the min/max bounds.
+    The file is read into memory and immediately discarded — nothing is stored.
+    """
+    import tempfile as _tmp
+    from backend.pipeline.pdf_to_images import pdfinfo_from_path
+
+    pdf_bytes = await file.read()
+    with _tmp.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(pdf_bytes)
+        tmp_path = tmp.name
+
+    try:
+        info = pdfinfo_from_path(tmp_path)
+        page_count = int(info.get("Pages", 1))
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"Could not read PDF: {exc}") from exc
+    finally:
+        Path(tmp_path).unlink(missing_ok=True)
+
+    return {"page_count": page_count, "filename": file.filename}
+
 
 @router.post("/comics", status_code=202)
 async def upload_comic(

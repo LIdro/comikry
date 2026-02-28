@@ -25,6 +25,31 @@
     </div>
   </section>
 
+  <!-- ── Page-range screen ──────────────────────────────────────────────── -->
+  <section id="range-screen" class="screen">
+    <div class="upload-card">
+      <h2 style="margin:0 0 6px">Select pages to process</h2>
+      <p id="range-total" style="margin:0 0 18px;opacity:.6;font-size:14px"></p>
+
+      <div class="range-row">
+        <label>From page
+          <input type="number" id="range-start" min="1" value="1" />
+        </label>
+        <span style="padding:0 10px;align-self:flex-end;padding-bottom:6px">–</span>
+        <label>To page
+          <input type="number" id="range-end" min="1" value="1" />
+        </label>
+      </div>
+
+      <label class="toggle-row" style="margin-top:12px">
+        <input type="checkbox" id="range-all" />
+        <span>Process entire PDF</span>
+      </label>
+
+      <button id="range-btn" style="margin-top:20px">Start Processing</button>
+    </div>
+  </section>
+
   <!-- ── Processing screen ──────────────────────────────────────────────── -->
   <section id="progress-screen" class="screen">
     <div class="progress-card">
